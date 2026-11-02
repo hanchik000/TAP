@@ -25,19 +25,13 @@ Developer Ovezov Emirhan · LTD EMIR LOGISTICS CO
 
 На GitHub Pages ИИ и общая база не работают — данные хранятся в браузере. Полная версия с ИИ (Claude) и общей базой работает как артефакт Claude.
 
-## ИИ на GitHub Pages
-API-ключ **никогда** не кладётся в код сайта — репозиторий публичный, ключ украдут. Ключ живёт только на прослойке (`proxy/`), сайт обращается к ней.
-Поддерживаются Google Gemini (ключ Vertex AI `AQ.…` или AI Studio `AIza…`) и Anthropic Claude.
+## ИИ на GitHub Pages (через GitHub Actions)
+Ключ хранится только как секрет репозитория: **Settings → Secrets and variables → Actions → New repository secret**, имя `GOOGLE_API_KEY`.
+При каждой публикации GitHub Actions (`scripts/ai-prepare.mjs`) с этим ключом заранее готовит `ai-data.json` — без ключа внутри:
+- умный поиск: синонимы, туркменские и английские слова, опечатки, поводы («подарок девушке») для каждого товара;
+- описания товаров на русском и туркменском;
+- готовые ИИ-сборки сайта для каждой сферы в трёх стилях (тёмный, яркий, светлый);
+- SMM-планы для каждой сферы.
 
-**Cloudflare Worker (бесплатно, 5 минут):**
-1. dash.cloudflare.com → Workers & Pages → Create → Worker → назовите `tap-ai` → Deploy.
-2. Edit code → загрузите `proxy/cloudflare-worker.js` и `proxy/providers.js` → Deploy.
-3. Settings → Variables and Secrets: секрет `GOOGLE_API_KEY` = ваш ключ; текст `ALLOWED_ORIGIN` = `https://hanchik000.github.io`.
-4. Откройте адрес воркера в браузере — должно быть `{"ok":true,"provider":"gemini"}`.
-5. В `config.js`: `aiProxy: 'https://tap-ai.<аккаунт>.workers.dev'`.
-
-**Render (настроено в `render.yaml`):** render.com → New → Blueprint → репозиторий `tap` → вставьте `GOOGLE_API_KEY` → Apply. Адрес `https://tap-ai.onrender.com` уже указан в `config.js`. Бесплатный сервер засыпает через 15 минут без запросов — первый ответ после сна идёт до минуты.
-
-**Свой сервер:** `GOOGLE_API_KEY=... node proxy/server.mjs` за HTTPS, адрес — в `config.js`.
-
-Модели по умолчанию: `gemini-2.5-flash` (поиск, чат, правки), `gemini-2.5-pro` (сложные задачи). Меняются переменными `GEMINI_MODEL_QUICK`, `GEMINI_MODEL_DEFAULT`, `GEMINI_MODEL_COMPLEX`.
+Результат кэшируется — повторные сборки ключ не тратят. Обновить заново: Actions → Deploy to GitHub Pages → Run workflow → «Подготовить ИИ-данные заново».
+Живые ответы (чат-продавец, правки словами, распознавание фото) на GitHub Pages работают по простым правилам; полностью — в версии на Claude или с прокси (`proxy/`, `render.yaml`).

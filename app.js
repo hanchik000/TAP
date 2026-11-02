@@ -154,6 +154,15 @@ async function aiBuild() {
   const tm = setInterval(() => { k = Math.min(k + 1, BUILD_STAGES.length - 1); const e = $('#bstage'); if (e) e.textContent = BUILD_STAGES[k]; }, 6000);
   let hint = ''; if (BUILD_IMGS[0]) { const c = await dominantColor(BUILD_IMGS[0].url); if (c) hint = `Главный цвет на первом изображении примерно ${c}.`; }
   const blobs = []; for (const b of BUILD_IMGS) blobs.push(await (await fetch(b.url)).blob());
+  await AI.ready; await AIDATA.ready;
+  if (!AI.live()) {
+    const mood = /тёмн|темн|чёрн|черн|дорог|люкс|премиум|строг/i.test(brief) ? 'dark' : /ярк|молод|смел|стрит|неон/i.test(brief) ? 'bright' : /неж|светл|мягк|уют|розов/i.test(brief) ? 'soft' : ['dark', 'bright', 'soft'][Math.floor(Math.random() * 3)];
+    const pre = AIDATA.d && AIDATA.d.sites && AIDATA.d.sites[S.biz.niche] && AIDATA.d.sites[S.biz.niche][mood];
+    await new Promise(res => setTimeout(res, 2400)); clearInterval(tm); btn.disabled = false;
+    if (!pre) { st.innerHTML = `<p class="err">ИИ-заготовки ещё не собраны. Выберите макет справа.</p>`; return; }
+    S.site = siteFromAI(clone(pre)); if (hint && BUILD_IMGS[0]) { const c = hint.match(/#[0-9a-f]{6}/i); if (c) S.site.th.p = c[0]; }
+    S.chat = [{ ai: 1, t: 'Подобрал вариант, который ИИ подготовил для вашей сферы. Нажмите на любой текст, чтобы поправить.' }]; save(); return go('editor');
+  }
   const r = await AI.json(`Ты — сильный веб-дизайнер конструктора сайтов TAP Business (Туркменистан). Собери главную страницу сайта-магазина.
 Бизнес: «${S.biz.name}», сфера: ${S.biz.niche}, город: ${S.biz.city}.
 Пожелания владельца: ${brief || 'нет, предложи сам лучшее решение для этой сферы'}.
@@ -282,6 +291,8 @@ DT.smm = () => {
 async function smmGen() {
   const m = smm(); const btn = $('#smmBtn'); btn.disabled = true; $('#smmSt').innerHTML = `<div class="ai-wait"><span class="spin"></span> Бот изучает ваш сайт и каталог…<small>20–40 секунд</small></div>`;
   const nets = NETS.filter(n => m.nets[n]); const L = { TM: 'туркменском', RU: 'русском', TR: 'турецком', EN: 'английском' }[m.lang];
+  await AI.ready; await AIDATA.ready;
+  if (!AI.live()) { const pre = AIDATA.d && AIDATA.d.smm && AIDATA.d.smm[S.site.niche]; btn.disabled = false; if (!pre) { $('#smmSt').innerHTML = '<p class="err">ИИ-план ещё не подготовлен.</p>'; return; } m.res = clone(pre); m.st = {}; save(); return render(); }
   const r = await AI.json(`Ты — SMM-менеджер для бизнеса в Туркменистане. Бизнес: «${S.site.name}», ${S.site.niche}, ${S.site.city}. Соцсети: ${nets.join(', ') || 'Instagram'}.
 Товары: ${S.site.products.slice(0, 12).map(p => `${p.name} — ${p.price} TMT${p.old ? ' (было ' + p.old + ')' : ''}`).join('; ')}.
 Сайт: tap.tm/${S.slug}. Сегодня ${new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}; учитывай ближайшие праздники и сезон.
@@ -418,14 +429,17 @@ TV.home = () => {
 TV.cats = () => `<h2>Категории</h2><p class="mut">Выберите — покажем товары всех магазинов</p><div class="cat-g">${CATS.map(c => `<button class="cat-c lift" onclick="S.tap.tab='home';tapSearch('${c[0].toLowerCase()} ${c[1]}')"><span>${catIc(c[2])}</span><b>${c[0]}</b><small>${catalog().filter(x => new RegExp(c[1].split(' ').map(w => w.slice(0, 5)).join('|'), 'i').test(x.p.name + ' ' + x.p.cat)).length} товаров</small></button>`).join('')}</div>`;
 function cardHTML(x) { const f = S.tap.fav[x.k]; return `<div class="pc" data-k="${esc(x.k)}" onclick="productSheet('${esc(x.slug)}','${esc(x.p.id)}')"><div class="pc-i">${pvHTML(x.p, x.s.th)}${x.p.old && x.p.old > x.p.price ? `<span class="sale">−${Math.round(100 - x.p.price / x.p.old * 100)}%</span>` : ''}<button class="fav ${f ? 'on' : ''}" onclick="event.stopPropagation();favT('${esc(x.k)}')" aria-label="В избранное">${IC.heart}</button></div><div class="pc-b"><div class="pc-n">${esc(x.p.name)}</div><div class="pc-p"><b>${fmt(x.p.price)} TMT</b>${x.p.old ? `<s>${fmt(x.p.old)}</s>` : ''}</div><div class="pc-s">${esc(x.s.name)} · ${esc(x.s.city)} · ★ ${x.s.rating || 5}</div></div></div>`; }
 function favT(k) { S.tap.fav[k] = !S.tap.fav[k]; LS.set('fav', S.tap.fav); renderTap(); }
-function resHTML() { const r = S.tap.res; const shops = new Set(r.items.map(x => x.slug)); return `<div class="understood">${IC.spark}<div><b>${esc(r.understood || 'Ищу: ' + S.tap.q)}</b><span>Найдено ${r.items.length} в ${shops.size} магазинах${r.ai ? '' : ' · простой поиск'}</span></div><button class="ib" onclick="S.tap.res=null;S.tap.q='';renderTap()" aria-label="Сбросить">${IC.x}</button></div>${r.items.length ? `<div class="pgrid">${r.items.map(cardHTML).join('')}</div>` : `<div class="empty"><b>Ничего не нашлось</b><p>Опишите иначе или уберите фильтр города.</p></div>`}`; }
+function resHTML() { const r = S.tap.res; const shops = new Set(r.items.map(x => x.slug)); return `<div class="understood">${IC.spark}<div><b>${esc(r.understood || 'Ищу: ' + S.tap.q)}</b><span>Найдено ${r.items.length} в ${shops.size} магазинах${r.ai ? (AI.live() ? '' : ' · умный индекс ИИ') : ' · простой поиск'}</span></div><button class="ib" onclick="S.tap.res=null;S.tap.q='';renderTap()" aria-label="Сбросить">${IC.x}</button></div>${r.items.length ? `<div class="pgrid">${r.items.map(cardHTML).join('')}</div>` : `<div class="empty"><b>Ничего не нашлось</b><p>Опишите иначе или уберите фильтр города.</p></div>`}`; }
 function stem(w) { return w.replace(/(иями|ями|ами|ого|ему|ыми|ими|ые|ий|ая|ое|ых|ой|ей|ам|ах|ов|ев|ы|и|а|я|е|у|ю|о)$/, ''); }
 function localSearch(q) {
   const l = q.toLowerCase(); const mx = (l.match(/до\s*(\d+)/) || [])[1]; const ws = l.replace(/\d+/g, ' ').split(/[^a-zа-яёäçňöşüýž]+/i).filter(w => w.length > 2 && !['для', 'где', 'манат', 'тмт', 'хочу', 'нужен', 'нужна', 'купить'].includes(w)).map(stem).filter(w => w.length > 2);
-  return catalog().map(x => { const t = (x.p.name + ' ' + (x.p.cat || '') + ' ' + x.s.niche + ' ' + x.s.city).toLowerCase(); return { x, sc: ws.reduce((a, w) => a + (t.includes(w) ? 1 : 0), 0) }; }).filter(o => o.sc > 0 && (!mx || o.x.p.price <= +mx)).sort((a, b) => b.sc - a.sc || a.x.p.price - b.x.p.price).map(o => o.x);
+  const tg = (AIDATA.d && AIDATA.d.tags) || {};
+  return catalog().map(x => { const a = tg[x.p.id]; const t = (x.p.name + ' ' + (x.p.cat || '') + ' ' + x.s.niche + ' ' + x.s.city + ' ' + (a ? a.tags.join(' ') : '')).toLowerCase(); const phrase = a && a.tags.some(g => l.includes(g.toLowerCase()) && g.length > 4) ? 2 : 0; return { x, sc: phrase + ws.reduce((s, w) => s + (t.includes(w) ? 1 : 0), 0) }; }).filter(o => o.sc > 0 && (!mx || o.x.p.price <= +mx)).sort((a, b) => b.sc - a.sc || a.x.p.price - b.x.p.price).map(o => o.x);
 }
 async function tapSearch(q, img) {
   q = String(q || '').trim(); if (!q && !img) return; S.tap.q = q; S.tap.res = { loading: 1 }; renderTap();
+  await AI.ready; await AIDATA.ready;
+  if (!AI.live()) { if (img) { S.tap.res = null; renderTap(); return toast('Поиск по фото', 'Работает в версии с живым ИИ'); } const items = localSearch(q).filter(x => !S.tap.city || x.s.city === S.tap.city); const mx = (q.match(/до\s*(\d+)/) || [])[1]; S.tap.res = { items, ai: !!AIDATA.d, understood: 'Ищу: ' + q + (mx ? ' · до ' + mx + ' TMT' : '') }; return renderTap(); }
   let cat = catalog(); if (S.tap.city) cat = cat.filter(x => x.s.city === S.tap.city);
   const lines = cat.slice(0, 400).map((x, i) => `${i}|${x.p.name}|${x.p.cat || ''}|${x.p.price}${x.p.old ? '(было ' + x.p.old + ')' : ''}|${x.s.name}|${x.s.niche}|${x.s.city}`).join('\n');
   const r = await AI.json(`Ты — умный поиск TAP по товарам и услугам магазинов Туркменистана. Покупатель ${img ? 'прислал фото того, что ищет' + (q ? ' и написал: «' + q + '»' : '') : 'ищет: «' + q + '»'}.
@@ -447,7 +461,7 @@ function productSheet(slug, pid) {
   const s = siteOf(slug); if (!s) return; const p = s.products.find(x => x.id === pid); if (!p) return;
   const same = catalog().filter(x => x.p.name.toLowerCase() === p.name.toLowerCase() && !(x.slug === slug && x.p.id === pid));
   const sub = S.tap.subs[slug];
-  sheet(`<div class="ps"><div class="ps-i">${pvHTML(p, s.th)}</div><div class="ps-b"><h3 class="sh-t">${esc(p.name)}</h3><div class="ps-p"><b>${fmt(p.price)} TMT</b>${p.old ? `<s>${fmt(p.old)}</s>` : ''}</div>${p.desc ? `<p class="mut">${esc(p.desc)}</p>` : ''}
+  sheet(`<div class="ps"><div class="ps-i">${pvHTML(p, s.th)}</div><div class="ps-b"><h3 class="sh-t">${esc(p.name)}</h3><div class="ps-p"><b>${fmt(p.price)} TMT</b>${p.old ? `<s>${fmt(p.old)}</s>` : ''}</div>${(() => { const a = AIDATA.d && AIDATA.d.tags && AIDATA.d.tags[p.id]; const d = p.desc || (a && a.ru); return (d ? `<p class="mut">${esc(d)}</p>` : '') + (a && a.tm ? `<p class="mut sm">TM: ${esc(a.tm)}</p>` : ''); })()}
   <div class="shop-row"><i style="background:${s.th.p};color:${onC(s.th.p)}">${esc(s.name[0])}</i><div><b>${esc(s.name)}</b><span>${esc(s.city)} · ★ ${s.rating || 5}</span></div><button class="btn ${sub ? 'ghost' : 'soft'} sm" onclick="S.tap.subs['${esc(slug)}']=!S.tap.subs['${esc(slug)}'];LS.set('subs',S.tap.subs);productSheet('${esc(slug)}','${esc(pid)}')">${sub ? 'Вы подписаны' : 'Подписаться'}</button></div>
   ${same.length ? `<div class="fl">Этот товар в других магазинах</div><div class="cmp">${[{ s, p, slug }, ...same].sort((a, b) => a.p.price - b.p.price).map((x, i) => `<div class="${x.slug === slug ? 'me' : ''}"><span>${esc(x.s.name)}, ${esc(x.s.city)}</span>${i === 0 ? '<em>дешевле всех</em>' : ''}<b>${fmt(x.p.price)} TMT</b></div>`).join('')}</div>` : ''}
   <div class="row g8 ps-act"><button class="btn ghost" onclick="chatOpen('${esc(slug)}','${esc(pid)}')">${IC.chat} Написать</button><button class="btn red" onclick="orderSheet('${esc(slug)}','${esc(pid)}')">Оставить заявку</button></div>
@@ -490,6 +504,17 @@ ${s.products.map(p => `- ${p.name}: ${p.price} TMT${p.old ? ' (было ' + p.ol
 Доставка по городу курьером-партнёром, обычно 20–25 TMT, оплата при получении. Чтобы заказать — кнопка «Оставить заявку».
 Правила: никогда не обещай скидку и не меняй цену сам. Если просят скидку, торгуются, спрашивают то, чего нет в каталоге, или хотят живого человека — ответь, что передал вопрос владельцу и он ответит здесь, и поставь escalate=true. Не выдумывай наличие размеров и сроков, которых нет в каталоге — тогда тоже escalate=true.
 Ответ ТОЛЬКО JSON: {"reply":"…","escalate":true|false,"reason":"если escalate — суть для владельца, напр. «Просит скидку 10% на 2 пары»"}`;
+  await AI.ready;
+  if (!AI.live()) { await new Promise(r => setTimeout(r, 700)); const l = t.toLowerCase(); const p = s.products.find(x => x.name === c.item) || s.products[0]; let reply, esc_ = false;
+    if (/скид|дешевл|уступ|торг|акци/.test(l)) { reply = 'Скидки решает владелец магазина — я передал ему ваш вопрос, он ответит здесь.'; esc_ = true; }
+    else if (/достав|когда|привез|курьер/.test(l)) reply = 'Доставка по городу курьером-партнёром, обычно 20–25 TMT, оплата при получении.';
+    else if (/налич|есть|размер|цвет/.test(l)) { reply = `${p.name} в наличии, ${fmt(p.price)} TMT. Точный размер или цвет уточнит владелец — я передал вопрос.`; esc_ = /размер|цвет/.test(l); }
+    else if (/оформ|заказ|беру|куплю/.test(l)) reply = 'Отлично! Открываю форму заявки.';
+    else reply = `${p.name} — ${fmt(p.price)} TMT. Спросите про наличие, доставку или нажмите «Оставить заявку».`;
+    CH.busy = false; c.msgs = c.msgs.concat([{ w: 'ai', t: reply, ts: Date.now() }]);
+    if (ref.demo) { ref.local = c; LS.set('mychats', S.tap.mychats); } else await Store.patch('chats', CH.id, { msgs: c.msgs, esc: esc_ || c.esc, reason: esc_ ? t : (c.reason || ''), ts: Date.now() });
+    chatDraw(); if (esc_) toast('Вопрос передан владельцу', 'Ответ придёт сюда');
+    if (/оформ|заказ|беру|куплю/.test(l) && p) setTimeout(() => orderSheet(ref.slug, p.id), 700); return; }
   const turns = [{ role: 'user', content: rules }]; c.msgs.slice(-10).forEach(m => { turns.push({ role: m.w === 'c' ? 'user' : 'assistant', content: (m.w === 'own' ? '[Владелец]: ' : '') + m.t }); });
   while (turns.length > 1 && turns[1].role === 'assistant') turns.splice(1, 1);
   const r = await AI.json(turns, { modelTier: 'quick', cache: false });

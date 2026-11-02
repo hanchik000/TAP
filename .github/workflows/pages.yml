@@ -1,26 +1,59 @@
+# Publishes TAP to GitHub Pages. Before publishing, AI (secret GOOGLE_API_KEY) prepares ai-data.json:
+# smart-search index, product descriptions, ready AI site builds and SMM plans. No keys end up in the site.
+# Results are cached between runs. Actions → "Deploy to GitHub Pages" → Run workflow → tick "refresh" to regenerate.
 name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      refresh:
+        description: Подготовить ИИ-данные заново
+        type: boolean
+        default: false
 permissions:
   contents: read
   pages: write
   id-token: write
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Restore AI data
+        uses: actions/cache/restore@v4
+        with:
+          path: .ai-cache
+          key: ai-data-${{ github.run_id }}
+          restore-keys: ai-data-
+      - name: Prepare AI data
+        run: node scripts/ai-prepare.mjs
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_MODEL_QUICK: ${{ vars.GEMINI_MODEL_QUICK }}
+          GEMINI_MODEL_DEFAULT: ${{ vars.GEMINI_MODEL_DEFAULT }}
+          REFRESH: ${{ inputs.refresh }}
+      - name: Save AI data
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .ai-cache
+          key: ai-data-${{ github.run_id }}
+      - name: Collect site files
+        run: mkdir -p _site && cp index.html config.js core.js site.js editor.js app.js _site/ && (cp ai-data.json _site/ 2>/dev/null || true)
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

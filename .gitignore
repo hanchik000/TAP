@@ -1,0 +1,4 @@
+.ai-cache/
+ai-data.json
+_site/
+node_modules/

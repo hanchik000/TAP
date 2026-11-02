@@ -175,6 +175,10 @@ const AI = {
   }
 };
 AI.ready = AI.init();
+AI.live = () => !!(AI.s || AI.proxy());
+/* AI prepared in advance by GitHub Actions (ai-data.json). Empty in the Claude version. */
+const AIDATA = { d: null };
+AIDATA.ready = fetch('ai-data.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { AIDATA.d = j; }).catch(() => { });
 Store.ready = Store.init();
 
 /* ===== toast / sheet ===== */

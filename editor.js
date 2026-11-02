@@ -308,6 +308,7 @@ async function prodByPhoto(inp) {
   const st = $('#prodSt'); if (st) st.innerHTML = `<div class="ai-wait"><span class="spin"></span> ИИ смотрит на фото и заполняет карточку…</div>`;
   let img; try { img = await addImage(f); } catch (e) { st && (st.innerHTML = ''); return toast('Не удалось открыть фото'); }
   const blob = await (await fetch(IMG[img.slice(4)])).blob();
+  await AI.ready; if (!AI.live()) { if (st) st.innerHTML = ''; const p = { id: uid('p'), name: '', price: 0, cat: '', desc: '', img }; site.products.unshift(p); PROD_AFTER(); toast('Фото добавлено', 'Заполните название и цену — распознавание фото работает с живым ИИ'); return prodEdit(p.id); }
   const r = await AI.json(`Ты помогаешь продавцу в Туркменистане завести товар в интернет-магазин «${site.name}» (${site.niche}). На фото — товар. Определи, что это, и ответь ТОЛЬКО JSON:
 {"name":"короткое название по-русски, 2-5 слов","tm":"название по-туркменски","cat":"категория одним-двумя словами","price":число — реалистичная цена в туркменских манатах (TMT) для розницы в Ашхабаде,"desc":"1-2 предложения по-русски: материал, особенности, для кого — без восклицаний"}
 Существующие категории магазина: ${[...new Set(site.products.map(p => p.cat).filter(Boolean))].join(', ') || 'нет'}.`, { images: [blob], modelTier: 'quick' });
@@ -356,6 +357,8 @@ async function aiAsk(q) {
   q = String(q || '').trim(); if (!q) return; ED.chat.push({ t: q }); edPanel();
   const ta = $('#aiQ'); if (ta) ta.value = '';
   const box = $('#aiMsgs'); box.insertAdjacentHTML('beforeend', `<div class="msg ai wait" id="aiWait"><span class="spin"></span> Думаю…</div>`); aiScroll();
+  await AI.ready;
+  if (!AI.live()) { const w0 = $('#aiWait'); w0 && w0.remove(); ED.chat.push({ ai: 1, t: localEdit(q) }); edCanvas(); edPanel(); edInsp(); edSaved(); return; }
   const hist = ED.chat.slice(-6, -1).map(m => (m.ai ? 'ИИ: ' : 'Владелец: ') + m.t).join('\n');
   const r = await AI.json(`Ты — ИИ-помощник конструктора сайтов TAP Business. Владелец бизнеса в Туркменистане просит изменить свой сайт. Выполни просьбу через операции над сайтом. Если просят совет — дай короткий конкретный совет (3-4 пункта) и при желании предложи операции. Пиши по-русски, коротко, дружелюбно, без воды. Соблюдай читаемость: контраст текста к фону высокий.
 ${OPS_DOC}
@@ -387,7 +390,23 @@ function applyOps(site, ops) {
   if (!site.secs.some(s => s.type === 'catalog')) site.secs.splice(Math.min(2, site.secs.length), 0, secMake('catalog', 'grid', site));
   return n;
 }
+function localEdit(q) {
+  const l = q.toLowerCase(); const th = ED.site.th; snap();
+  const cols = { красн: '#c62828', син: '#2a47c8', зел: '#1f9d63', золот: '#c9a24a', розов: '#c93f74', фиолет: '#6d4bd8', оранж: '#e0631c', медн: '#c2612a', черн: '#111111', чёрн: '#111111', бирюз: '#0e8a7a' };
+  if (/темн|тёмн|черн|чёрн|ночн/.test(l) && /фон|сайт|тем|сделай/.test(l)) { Object.assign(th, { bg: '#0c0c0d', tx: '#f2efe9', sf: '#17171a' }); return 'Сделал сайт тёмным.'; }
+  if (/светл|бел/.test(l) && /фон|сайт|тем/.test(l)) { Object.assign(th, { bg: '#f5f5f3', tx: '#111111', sf: '#ffffff' }); return 'Сделал сайт светлым.'; }
+  const ck = Object.keys(cols).find(k => l.includes(k)); if (ck) { th.p = cols[ck]; return 'Поменял основной цвет.'; }
+  if (/дорож|люкс|строж|строг/.test(l)) { Object.assign(th, { fh: 'Cormorant Garamond', fb: 'Jost', r: 2, btn: 'line' }); return 'Сделал стиль дороже и строже: шрифт Cormorant, тонкие кнопки.'; }
+  if (/молод|ярч|смел/.test(l)) { Object.assign(th, { fh: 'Unbounded', fb: 'Onest', r: 20, btn: 'pill', up: true }); return 'Сделал стиль смелее: Unbounded и круглые кнопки.'; }
+  const add = Object.entries({ reviews: 'отзыв', faq: 'вопрос', stats: 'цифр', marquee: 'бегущ', slider: 'слайдер', bento: 'бенто', promo: 'акци', gallery: 'галер', contacts: 'контакт' }).find(([k, w]) => l.includes(w));
+  if (add && /добав|вставь|нужн/.test(l)) { const s = secMake(add[0], null, ED.site); const a = ED.site.secs; a.splice(a.length && a[a.length - 1].type === 'footer' ? a.length - 1 : a.length, 0, s); return 'Добавил блок «' + BLOCKS[add[0]].name + '».'; }
+  if (add && /убер|удал|скрой/.test(l)) { const n = ED.site.secs.length; ED.site.secs = ED.site.secs.filter(s => s.type !== add[0]); return ED.site.secs.length < n ? 'Убрал блок «' + BLOCKS[add[0]].name + '».' : 'Такого блока нет на сайте.'; }
+  const pct = l.match(/(\d+)\s*%/); if (pct && /цен/.test(l)) { const k = (/ниже|дешев|скид|умен/.test(l) ? -1 : 1) * +pct[1] / 100; ED.site.products.forEach(p => { if (k < 0) p.old = p.old || p.price; p.price = Math.round(p.price * (1 + k)); }); return `Изменил цены на ${pct[1]}%.`; }
+  ED.hist.pop();
+  return 'В этой версии я понимаю простые команды: «сделай тёмным», «цвет синий», «дороже и строже», «добавь отзывы», «убери вопросы», «цены ниже на 10%». Свободные просьбы — в версии с живым ИИ.';
+}
 async function aiRewrite(mode) {
+  await AI.ready; if (!AI.live()) return toast('Переписывание текста', 'Работает в версии с живым ИИ');
   const { sid, f } = ED._tf; const s = secById(sid); const cur = getP(s.d, f); if (!cur) return;
   toast('ИИ переписывает…');
   const t = await AI.text(`Перепиши текст для сайта бизнеса «${ED.site.name}» (${ED.site.niche}, Туркменистан). Задача: ${mode}. Сохрани смысл и примерно ту же длину (для «Короче» — вдвое короче). Без кавычек, без пояснений, только новый текст.\n\nТекст: ${cur}`, { modelTier: 'quick', cache: false });
