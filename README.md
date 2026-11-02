@@ -27,12 +27,15 @@ Developer Ovezov Emirhan · LTD EMIR LOGISTICS CO
 
 ## ИИ на GitHub Pages
 API-ключ **никогда** не кладётся в код сайта — репозиторий публичный, ключ украдут. Ключ живёт только на прослойке (`proxy/`), сайт обращается к ней.
+Поддерживаются Google Gemini (ключ Vertex AI `AQ.…` или AI Studio `AIza…`) и Anthropic Claude.
 
-**Вариант 1 — Cloudflare Worker (бесплатно, 5 минут):**
-1. dash.cloudflare.com → Workers & Pages → Create → Worker → вставьте код из `proxy/cloudflare-worker.js` → Deploy.
-2. Settings → Variables: секрет `ANTHROPIC_API_KEY` = ваш ключ; переменная `ALLOWED_ORIGIN` = `https://hanchik000.github.io`.
-3. В `config.js` укажите адрес воркера: `aiProxy: 'https://<имя>.<аккаунт>.workers.dev/ai'`.
+**Cloudflare Worker (бесплатно, 5 минут):**
+1. dash.cloudflare.com → Workers & Pages → Create → Worker → назовите `tap-ai` → Deploy.
+2. Edit code → загрузите `proxy/cloudflare-worker.js` и `proxy/providers.js` → Deploy.
+3. Settings → Variables and Secrets: секрет `GOOGLE_API_KEY` = ваш ключ; текст `ALLOWED_ORIGIN` = `https://hanchik000.github.io`.
+4. Откройте адрес воркера в браузере — должно быть `{"ok":true,"provider":"gemini"}`.
+5. В `config.js`: `aiProxy: 'https://tap-ai.<аккаунт>.workers.dev'`.
 
-**Вариант 2 — свой сервер:** `ANTHROPIC_API_KEY=... node proxy/server.mjs` за HTTPS (nginx/caddy), адрес — в `config.js`.
+**Свой сервер:** `GOOGLE_API_KEY=... node proxy/server.mjs` за HTTPS, адрес — в `config.js`.
 
-Модели: быстрые задачи — `claude-haiku-5-5`, сборка сайта — `claude-sonnet-5-5`.
+Модели по умолчанию: `gemini-2.5-flash` (поиск, чат, правки), `gemini-2.5-pro` (сложные задачи). Меняются переменными `GEMINI_MODEL_QUICK`, `GEMINI_MODEL_DEFAULT`, `GEMINI_MODEL_COMPLEX`.
