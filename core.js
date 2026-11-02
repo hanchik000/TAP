@@ -132,21 +132,46 @@ const AI = {
   s: null, imgs: false, ready: null,
   async init() {
     try { if (window.claude && window.claude.use) this.s = await window.claude.use('sample'); } catch (e) { this.s = null; }
-    if (this.s) { try { const l = await this.s.limits(); this.imgs = !!(l && l.images); } catch (e) { } }
+    if (this.s) { try { const l = await this.s.limits(); this.imgs = !!(l && l.images); } catch (e) { } } else if (this.proxy()) this.imgs = true;
   },
   msg(e) {
     const m = { not_granted: 'ИИ не разрешён. Обновите страницу и нажмите «Разрешить».', sampling_disabled: 'ИИ недоступен для этого аккаунта.', rate_limited: 'Слишком много запросов — попробуйте через минуту.', refused: 'ИИ не стал это делать — сформулируйте иначе.', invalid_json: 'ИИ ответил неразборчиво — нажмите ещё раз.', image_rejected: 'Фото не подошло — выберите JPG или PNG.', images_unavailable: 'Здесь нельзя отправить фото в ИИ.', session_expired: 'Войдите в Claude заново.', prompt_too_large: 'Слишком много данных для ИИ.' };
     return m[e && e.code] || 'ИИ не ответил. Попробуйте ещё раз.';
   },
+  /* Without Claude (e.g. GitHub Pages) the page calls our own proxy; the API key lives only on the proxy. */
+  proxy() { return (window.TAP_CONFIG && window.TAP_CONFIG.aiProxy) || ''; },
+  async viaProxy(prompt, o, wantJson) {
+    const msgs = typeof prompt === 'string' ? [{ role: 'user', content: prompt }] : prompt.map(m => ({ role: m.role, content: m.content }));
+    if (wantJson) msgs[msgs.length - 1].content += '\n\nОтветь только JSON, без пояснений и без markdown.';
+    const imgs = o.images ? (o.images instanceof Blob ? [o.images] : [...o.images]) : [];
+    if (imgs.length) {
+      const blocks = [];
+      for (const b of imgs.slice(0, 4)) { const d = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }); const m = String(d).match(/^data:(image\/[a-z]+);base64,(.*)$/); if (m) blocks.push({ type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } }); }
+      const last = msgs[msgs.length - 1]; last.content = [...blocks, { type: 'text', text: last.content }];
+    }
+    const r = await fetch(this.proxy(), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: msgs, tier: o.modelTier || 'default' }) });
+    if (!r.ok) throw { code: r.status === 429 ? 'rate_limited' : 'upstream_error' };
+    const j = await r.json(); const text = String(j.text || '');
+    if (!wantJson) return text;
+    const t = text.trim(); const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const cand = fence ? fence[1] : t.slice(Math.min(...['{', '['].map(c => t.indexOf(c)).filter(i => i >= 0)), Math.max(t.lastIndexOf('}'), t.lastIndexOf(']')) + 1);
+    try { return JSON.parse(cand); } catch (e) { throw { code: 'invalid_json' }; }
+  },
   async json(prompt, o = {}) {
     await this.ready;
-    if (!this.s) { toast('ИИ работает в версии на Claude', 'Здесь показан поиск и демо без ИИ'); return null; }
-    try { return await this.s.json(prompt, o); } catch (e) { if (e && e.code !== 'cancelled') toast('ИИ', this.msg(e)); return null; }
+    try {
+      if (this.s) return await this.s.json(prompt, o);
+      if (this.proxy()) return await this.viaProxy(prompt, o, true);
+      toast('ИИ не подключён', 'Укажите адрес ИИ-прокси в config.js'); return null;
+    } catch (e) { if (e && e.code !== 'cancelled') toast('ИИ', this.msg(e)); return null; }
   },
   async text(prompt, o = {}) {
     await this.ready;
-    if (!this.s) { toast('ИИ работает в версии на Claude', 'Здесь показан поиск и демо без ИИ'); return null; }
-    try { const r = await this.s(prompt, o); return r.text; } catch (e) { if (e && e.code !== 'cancelled') toast('ИИ', this.msg(e)); return null; }
+    try {
+      if (this.s) { const r = await this.s(prompt, o); return r.text; }
+      if (this.proxy()) return await this.viaProxy(prompt, o, false);
+      toast('ИИ не подключён', 'Укажите адрес ИИ-прокси в config.js'); return null;
+    } catch (e) { if (e && e.code !== 'cancelled') toast('ИИ', this.msg(e)); return null; }
   }
 };
 AI.ready = AI.init();

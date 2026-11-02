@@ -24,3 +24,15 @@ Developer Ovezov Emirhan · LTD EMIR LOGISTICS CO
 Статический сайт без сборки: откройте `index.html` или включите GitHub Pages (Settings → Pages → Source: GitHub Actions).
 
 На GitHub Pages ИИ и общая база не работают — данные хранятся в браузере. Полная версия с ИИ (Claude) и общей базой работает как артефакт Claude.
+
+## ИИ на GitHub Pages
+API-ключ **никогда** не кладётся в код сайта — репозиторий публичный, ключ украдут. Ключ живёт только на прослойке (`proxy/`), сайт обращается к ней.
+
+**Вариант 1 — Cloudflare Worker (бесплатно, 5 минут):**
+1. dash.cloudflare.com → Workers & Pages → Create → Worker → вставьте код из `proxy/cloudflare-worker.js` → Deploy.
+2. Settings → Variables: секрет `ANTHROPIC_API_KEY` = ваш ключ; переменная `ALLOWED_ORIGIN` = `https://hanchik000.github.io`.
+3. В `config.js` укажите адрес воркера: `aiProxy: 'https://<имя>.<аккаунт>.workers.dev/ai'`.
+
+**Вариант 2 — свой сервер:** `ANTHROPIC_API_KEY=... node proxy/server.mjs` за HTTPS (nginx/caddy), адрес — в `config.js`.
+
+Модели: быстрые задачи — `claude-haiku-5-5`, сборка сайта — `claude-sonnet-5-5`.
