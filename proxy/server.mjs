@@ -9,6 +9,7 @@ const hits = new Map(); // per-IP limit: 60 requests / 10 min
 http.createServer(async (req, res) => {
   const cors = { 'Access-Control-Allow-Origin': ALLOWED, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type' };
   if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
+  if (req.method === 'GET') { res.writeHead(200, { ...cors, 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, provider: env.GOOGLE_API_KEY ? 'gemini' : 'claude' })); }
   if (req.method !== 'POST' || req.headers.origin !== ALLOWED) { res.writeHead(403, cors); return res.end(); }
   const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress; const now = Date.now();
   const h = (hits.get(ip) || []).filter(t => now - t < 600000); h.push(now); hits.set(ip, h);

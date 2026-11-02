@@ -1,0 +1,17 @@
+# Render Blueprint: ИИ-прокси TAP. render.com → New → Blueprint → репозиторий tap → вставить GOOGLE_API_KEY → Apply.
+services:
+  - type: web
+    name: tap-ai
+    runtime: node
+    plan: free
+    rootDir: proxy
+    buildCommand: echo "no build"
+    startCommand: node server.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGIN
+        value: https://hanchik000.github.io
+      - key: NODE_VERSION
+        value: "22"

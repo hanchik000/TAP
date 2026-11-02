@@ -36,6 +36,8 @@ API-ключ **никогда** не кладётся в код сайта — �
 4. Откройте адрес воркера в браузере — должно быть `{"ok":true,"provider":"gemini"}`.
 5. В `config.js`: `aiProxy: 'https://tap-ai.<аккаунт>.workers.dev'`.
 
+**Render (настроено в `render.yaml`):** render.com → New → Blueprint → репозиторий `tap` → вставьте `GOOGLE_API_KEY` → Apply. Адрес `https://tap-ai.onrender.com` уже указан в `config.js`. Бесплатный сервер засыпает через 15 минут без запросов — первый ответ после сна идёт до минуты.
+
 **Свой сервер:** `GOOGLE_API_KEY=... node proxy/server.mjs` за HTTPS, адрес — в `config.js`.
 
 Модели по умолчанию: `gemini-2.5-flash` (поиск, чат, правки), `gemini-2.5-pro` (сложные задачи). Меняются переменными `GEMINI_MODEL_QUICK`, `GEMINI_MODEL_DEFAULT`, `GEMINI_MODEL_COMPLEX`.

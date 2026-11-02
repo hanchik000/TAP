@@ -132,7 +132,7 @@ const AI = {
   s: null, imgs: false, ready: null,
   async init() {
     try { if (window.claude && window.claude.use) this.s = await window.claude.use('sample'); } catch (e) { this.s = null; }
-    if (this.s) { try { const l = await this.s.limits(); this.imgs = !!(l && l.images); } catch (e) { } } else if (this.proxy()) this.imgs = true;
+    if (this.s) { try { const l = await this.s.limits(); this.imgs = !!(l && l.images); } catch (e) { } } else if (this.proxy()) { this.imgs = true; fetch(this.proxy()).catch(() => { }); /* wake the free server early */ }
   },
   msg(e) {
     const m = { not_granted: 'ИИ не разрешён. Обновите страницу и нажмите «Разрешить».', sampling_disabled: 'ИИ недоступен для этого аккаунта.', rate_limited: 'Слишком много запросов — попробуйте через минуту.', refused: 'ИИ не стал это делать — сформулируйте иначе.', invalid_json: 'ИИ ответил неразборчиво — нажмите ещё раз.', image_rejected: 'Фото не подошло — выберите JPG или PNG.', images_unavailable: 'Здесь нельзя отправить фото в ИИ.', session_expired: 'Войдите в Claude заново.', prompt_too_large: 'Слишком много данных для ИИ.' };
